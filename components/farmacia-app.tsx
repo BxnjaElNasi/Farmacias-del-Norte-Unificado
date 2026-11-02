@@ -167,6 +167,17 @@ async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   return payload as T;
 }
 
+function formatDateOnly(value: string | Date | null | undefined) {
+  if (!value) return "Sin fecha";
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? "Sin fecha" : new Intl.DateTimeFormat("es-AR").format(value);
+  }
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  if (match) return new Intl.DateTimeFormat("es-AR").format(new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? "Sin fecha" : new Intl.DateTimeFormat("es-AR").format(parsed);
+}
+
 function formatTime(value: string) {
   return new Intl.DateTimeFormat("es", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
 }
@@ -881,7 +892,7 @@ export function FarmaciaApp() {
             <section>
               <PageHeading eyebrow="ACCESO RESTRINGIDO" title="Cámaras" detail="Panel de cámaras." />
               {!cameraUnlocked ? <div className="camera-gate panel"><div><span className="eyebrow">PANEL PRIVADO</span><h2>Ingresá el patrón de acceso</h2></div><div className="pattern-grid" aria-label="Patrón de nueve puntos">{Array.from({ length: 9 }, (_, index) => <button key={index} className={cameraPattern.includes(index) ? "selected" : ""} aria-pressed={cameraPattern.includes(index)} onClick={() => enterCameraPattern(index)} aria-label={`Punto ${index + 1}`} />)}</div><button className="text-button" onClick={() => { setCameraPattern([]); setNotice(null); }}>Borrar patrón</button></div>
-                : <><div className="camera-grid">{["Canal 01", "Canal 02", "Canal 03"].map((name, index) => <article className="camera-feed" key={name}><div className={`camera-feed-screen camera-feed-screen-${index + 1}`}><span className="camera-status-icon" aria-hidden="true">◉</span></div><div className="camera-feed-caption"><b>{name}</b></div></article>)}</div><button className="secondary-button" onClick={() => setCameraUnlocked(false)}>Bloquear panel</button></>}
+                : <><CameraWall /><button className="secondary-button" onClick={() => setCameraUnlocked(false)}>Bloquear panel</button></>}
             </section>
           )}
           <footer className="page-footer"><span>Farmacias del Norte</span><span>Datos centralizados · Acceso según tu perfil</span></footer>
@@ -889,6 +900,124 @@ export function FarmaciaApp() {
       </main>
       {modal && <ModalForm key={modal} modal={modal} products={products} branches={branches} categories={categories} editingBranch={editingBranch} editingProduct={editingProduct} editingUser={editingUser} editingMovement={editingMovement} priceHistory={priceHistory} busy={busy} onClose={() => setModal(null)} onSubmit={handleSubmit} />}
       {receiptMovement && <ReceiptModal movement={receiptMovement} email={receiptEmail} error={receiptError} onEmailChange={setReceiptEmail} busy={busy} onClose={() => setReceiptMovement(null)} onSubmit={sendMovementReceipt} />}
+    </div>
+  );
+}
+
+type CameraBranch = {
+  id: string;
+  name: string;
+  cameras: Array<{ id: string; position: number; name: string; streamUrl: string }>;
+};
+
+const CAMERA_ZONE_ORDER = ["norte", "sur", "este", "oeste"];
+
+function cameraZone(branchName: string) {
+  const lower = branchName.toLowerCase();
+  const match = CAMERA_ZONE_ORDER.find((zone) => lower.includes(zone));
+  return match ? match.charAt(0).toUpperCase() + match.slice(1) : "";
+}
+
+function CameraScreen({ className, label }: { className: string; label: string }) {
+  return (
+    <div className={`camera-feed-screen ${className}`} role="img" aria-label={label}>
+      <div className="thermal-layer" aria-hidden="true" />
+      <div className="radar-grid" aria-hidden="true" />
+      <div className="radar-sweep" aria-hidden="true" />
+      <span className="thermal-blip thermal-blip-a" aria-hidden="true" />
+      <span className="thermal-blip thermal-blip-b" aria-hidden="true" />
+      <span className="thermal-blip thermal-blip-c" aria-hidden="true" />
+      <span className="camera-rec" aria-hidden="true">● REC</span>
+      <span className="camera-scanline" aria-hidden="true" />
+    </div>
+  );
+}
+
+function CameraFeed({ branchName, zone, camera, index }: { branchName: string; zone: string; camera: CameraBranch["cameras"][number]; index: number }) {
+  const [fullscreen, setFullscreen] = useState(false);
+  const title = `${branchName}${zone ? ` · ${zone}` : ""} — ${camera.name}`;
+
+  useEffect(() => {
+    if (!fullscreen) return;
+    function handleKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setFullscreen(false);
+    }
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [fullscreen]);
+
+  return (
+    <article className="camera-feed">
+      <CameraScreen className={`camera-feed-screen-${(index % 3) + 1}`} label={title} />
+      <div className="camera-feed-caption">
+        <b>{camera.name}</b>
+        <button type="button" className="camera-fullscreen-button" onClick={() => setFullscreen(true)} aria-label={`Ver ${title} en pantalla completa`}>⤢ Pantalla completa</button>
+      </div>
+      {fullscreen && (
+        <div className="camera-fullscreen" role="dialog" aria-modal="true" aria-label={title}>
+          <CameraScreen className={`camera-feed-screen-${(index % 3) + 1} camera-feed-screen-full`} label={title} />
+          <div className="camera-fullscreen-bar">
+            <span>{title}</span>
+            <button type="button" className="secondary-button" onClick={() => setFullscreen(false)}>Cerrar (Esc)</button>
+          </div>
+        </div>
+      )}
+    </article>
+  );
+}
+
+function CameraWall() {
+  const [branches, setBranches] = useState<CameraBranch[] | null>(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/cameras")
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error ?? "No se pudieron cargar las cámaras.");
+        return data as CameraBranch[];
+      })
+      .then((data) => {
+        if (!active) return;
+        const rank = (name: string) => {
+          const index = CAMERA_ZONE_ORDER.indexOf(cameraZone(name).toLowerCase());
+          return index === -1 ? CAMERA_ZONE_ORDER.length : index;
+        };
+        const sorted = [...data].sort((a, b) => rank(a.name) - rank(b.name) || a.name.localeCompare(b.name));
+        setBranches(sorted);
+      })
+      .catch((cause: Error) => {
+        if (active) setError(cause.message);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  if (error) return <div className="store-empty">{error}</div>;
+  if (!branches) return <div className="store-empty">Cargando cámaras…</div>;
+  if (!branches.length) return <EmptyState title="Sin cámaras configuradas" detail="Agregá sucursales activas para que aparezcan sus cámaras." />;
+
+  return (
+    <div className="camera-wall">
+      {branches.map((branch) => {
+        const zone = cameraZone(branch.name);
+        return (
+          <section key={branch.id} className="camera-branch">
+            <header className="camera-branch-header">
+              <span className="eyebrow">{zone || "Sucursal"}</span>
+              <h3>{branch.name}</h3>
+              <small>{branch.cameras.length} cámaras</small>
+            </header>
+            <div className="camera-grid">
+              {branch.cameras.map((camera, index) => (
+                <CameraFeed key={camera.id} branchName={branch.name} zone={zone} camera={camera} index={index} />
+              ))}
+            </div>
+          </section>
+        );
+      })}
     </div>
   );
 }
@@ -963,7 +1092,7 @@ function DashboardSection({ data, error, onGo, onRetry, isAdmin }: { data: Dashb
 }
 
 function ExpiryRow({ lot, expired }: { lot: DashboardData["expiring"][number]; expired: boolean }) {
-  return <div className="expiry-row"><span className={`expiry-symbol ${expired ? "expired" : ""}`}>{expired ? "!" : "◷"}</span><div><b>{lot.name}</b><small>{lot.lot_number} · {lot.branch_name}</small></div><span className="expiry-date"><b>{lot.quantity} ud.</b><small>{new Intl.DateTimeFormat("es").format(new Date(`${lot.expires_on}T00:00:00`))}</small></span></div>;
+  return <div className="expiry-row"><span className={`expiry-symbol ${expired ? "expired" : ""}`}>{expired ? "!" : "◷"}</span><div><b>{lot.name}</b><small>{lot.lot_number} · {lot.branch_name}</small></div><span className="expiry-date"><b>{lot.quantity} ud.</b><small>{formatDateOnly(lot.expires_on)}</small></span></div>;
 }
 
 function SaleForm({ products, onSubmit, busy }: { products: Product[]; onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<boolean>; busy: boolean }) {
@@ -1128,7 +1257,7 @@ function ReceiptModal({ movement, email, error, onEmailChange, busy, onClose, on
       <header><img src="/farmacias-del-norte-logo.png" alt="" /><div><b>FARMACIAS DEL NORTE</b><span>{movement.branch_name}</span><small>{movement.branch_address || "Dirección no informada"}{movement.branch_phone ? ` · ${movement.branch_phone}` : ""}</small></div></header>
       <div className="receipt-nonfiscal">COMPROBANTE INTERNO — NO FISCAL</div>
       <h2>{label} de inventario</h2>
-      <dl><dt>Movimiento</dt><dd>{movement.id.slice(0, 8).toUpperCase()}</dd><dt>Tipo</dt><dd>{label}</dd><dt>Fecha y hora</dt><dd>{formatTime(movement.created_at)}</dd><dt>Sucursal</dt><dd>{movement.branch_name}</dd><dt>Dirección</dt><dd>{movement.branch_address || "No informada"}</dd><dt>Teléfono</dt><dd>{movement.branch_phone || "No informado"}</dd><dt>Producto</dt><dd>{movement.product_name} · {movement.internal_code}</dd><dt>Cantidad</dt><dd>{movement.quantity > 0 ? "+" : ""}{movement.quantity} unidades</dd><dt>Lote</dt><dd>{movement.lot_number || "No aplica"}</dd><dt>Vencimiento</dt><dd>{movement.expires_on ? new Intl.DateTimeFormat("es-AR").format(new Date(`${movement.expires_on}T00:00:00`)) : "No informado"}</dd><dt>Responsable</dt><dd>{movement.user_name}</dd><dt>Motivo</dt><dd>{movement.reason}</dd>{movement.edited_by && <><dt>Motivo corregido por</dt><dd>{movement.edited_by}</dd></>}</dl>
+      <dl><dt>Movimiento</dt><dd>{movement.id.slice(0, 8).toUpperCase()}</dd><dt>Tipo</dt><dd>{label}</dd><dt>Fecha y hora</dt><dd>{formatTime(movement.created_at)}</dd><dt>Sucursal</dt><dd>{movement.branch_name}</dd><dt>Dirección</dt><dd>{movement.branch_address || "No informada"}</dd><dt>Teléfono</dt><dd>{movement.branch_phone || "No informado"}</dd><dt>Producto</dt><dd>{movement.product_name} · {movement.internal_code}</dd><dt>Cantidad</dt><dd>{movement.quantity > 0 ? "+" : ""}{movement.quantity} unidades</dd><dt>Lote</dt><dd>{movement.lot_number || "No aplica"}</dd><dt>Vencimiento</dt><dd>{movement.expires_on ? formatDateOnly(movement.expires_on) : "No informado"}</dd><dt>Responsable</dt><dd>{movement.user_name}</dd><dt>Motivo</dt><dd>{movement.reason}</dd>{movement.edited_by && <><dt>Motivo corregido por</dt><dd>{movement.edited_by}</dd></>}</dl>
       <p>Este documento es un comprobante interno de movimiento de inventario. No constituye factura ni comprobante fiscal válido.</p>
     </article>
     <form className="receipt-email-form" onSubmit={onSubmit}><label>Enviar copia por correo (requiere SMTP configurado)<input value={email} onChange={(event) => onEmailChange(event.target.value)} name="email" type="email" maxLength={254} placeholder="destino@correo.com" required /></label>{error && <p className="receipt-form-error" role="alert">{error}</p>}<div><button type="button" className="secondary-button" onClick={onClose}>Cerrar</button><button type="button" className="secondary-button" onClick={() => window.print()}>Imprimir</button><button className="primary-button" disabled={busy}>{busy ? "Enviando…" : "Enviar correo"}</button></div></form>
