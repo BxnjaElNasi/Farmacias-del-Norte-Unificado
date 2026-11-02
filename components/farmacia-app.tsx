@@ -751,10 +751,8 @@ export function FarmaciaApp() {
     { id: "sales", title: "Ventas", group: "OPERACIONES" },
     { id: "orders", title: "Pedidos online", group: "OPERACIONES" },
   );
-  if (admin) nav.push(
-    { id: "users", title: "Usuarios", group: "ADMINISTRACIÓN" },
-    { id: "cameras", title: "Cámaras", group: "ADMINISTRACIÓN" },
-  );
+  if (admin) nav.push({ id: "users", title: "Usuarios", group: "ADMINISTRACIÓN" });
+  nav.push({ id: "cameras", title: "Cámaras", group: admin ? "ADMINISTRACIÓN" : "OPERACIONES" });
   const currentTitle = nav.find((item) => item.id === section)?.title ?? "Resumen";
 
   return (
@@ -914,7 +912,7 @@ export function FarmaciaApp() {
               })}</div>}
             </section>
           )}
-          {section === "cameras" && admin && (
+          {section === "cameras" && user && (
             <section>
               <PageHeading eyebrow="ACCESO RESTRINGIDO" title="Cámaras" detail="Panel de cámaras." />
               {!cameraUnlocked ? <div className="camera-gate panel"><div><span className="eyebrow">PANEL PRIVADO</span><h2>Ingresá el patrón de acceso</h2></div><div className="pattern-grid" aria-label="Patrón de nueve puntos">{Array.from({ length: 9 }, (_, index) => <button key={index} className={cameraPattern.includes(index) ? "selected" : ""} aria-pressed={cameraPattern.includes(index)} onClick={() => enterCameraPattern(index)} aria-label={`Punto ${index + 1}`} />)}</div><button className="text-button" onClick={() => { setCameraPattern([]); setNotice(null); }}>Borrar patrón</button></div>

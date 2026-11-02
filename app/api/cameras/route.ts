@@ -4,7 +4,9 @@ import { withDb } from "@/lib/db";
 
 export async function GET() {
   try {
-    await requireRole("admin");
+    const user = await requireRole("admin", "employee");
+    // Un empleado solo ve las cámaras de su sucursal; sin sucursal asignada no ve ninguna.
+    if (user.role === "employee" && !user.branchId) return NextResponse.json([]);
     const rows = await withDb(async (client) => {
       // Cada sucursal activa debe tener sus 3 cámaras, incluso si se creó después de la migración.
       await client.query(
@@ -32,8 +34,9 @@ export async function GET() {
                 c.id AS camera_id, c.position, c.name AS camera_name, c.stream_url
          FROM branches b
          JOIN branch_cameras c ON c.branch_id = b.id AND c.active = true
-         WHERE b.active = true
+         WHERE b.active = true AND ($1::uuid IS NULL OR b.id = $1)
          ORDER BY b.name, c.position`,
+        [user.role === "employee" ? user.branchId : null],
       );
       return result.rows;
     });
