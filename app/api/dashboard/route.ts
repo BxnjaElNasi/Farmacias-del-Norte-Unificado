@@ -44,7 +44,7 @@ export async function GET(request: Request) {
           [branchId],
         ),
         client.query(
-          `SELECT p.name, l.lot_number, l.expires_on, l.quantity::int AS quantity, b.name AS branch_name
+          `SELECT p.name, l.lot_number, to_char(l.expires_on, 'YYYY-MM-DD') AS expires_on, l.quantity::int AS quantity, b.name AS branch_name
            FROM inventory_lots l JOIN products p ON p.id = l.product_id JOIN branches b ON b.id = l.branch_id
            WHERE l.quantity > 0 AND l.expires_on BETWEEN current_date AND current_date + 30
              AND ($1::uuid IS NULL OR l.branch_id = $1)
@@ -52,7 +52,7 @@ export async function GET(request: Request) {
           [branchId],
         ),
         client.query(
-          `SELECT p.name, l.lot_number, l.expires_on, l.quantity::int AS quantity, b.name AS branch_name
+          `SELECT p.name, l.lot_number, to_char(l.expires_on, 'YYYY-MM-DD') AS expires_on, l.quantity::int AS quantity, b.name AS branch_name
            FROM inventory_lots l JOIN products p ON p.id = l.product_id JOIN branches b ON b.id = l.branch_id
            WHERE l.quantity > 0 AND l.expires_on < current_date
              AND ($1::uuid IS NULL OR l.branch_id = $1)
