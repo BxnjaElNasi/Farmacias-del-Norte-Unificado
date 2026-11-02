@@ -6,6 +6,14 @@ export async function GET() {
   try {
     await requireRole("admin");
     const rows = await withDb(async (client) => {
+      // Cada sucursal activa debe tener sus 3 cámaras, incluso si se creó después de la migración.
+      await client.query(
+        `INSERT INTO branch_cameras (branch_id, position, name)
+         SELECT b.id, n, 'Cámara ' || n
+         FROM branches b CROSS JOIN generate_series(1, 3) AS n
+         WHERE b.active = true
+         ON CONFLICT (branch_id, position) DO NOTHING`,
+      );
       const result = await client.query(
         `SELECT b.id AS branch_id, b.name AS branch_name,
                 c.id AS camera_id, c.position, c.name AS camera_name, c.stream_url
