@@ -188,7 +188,7 @@ td:first-child, th:first-child { padding-left: 18px; }
 .branch-metrics { display: flex; gap: 17px; border-top: 1px solid #edf1ed; border-bottom: 1px solid #edf1ed; margin: 14px 0 10px; padding: 10px 0; color: #89968f; font-size: 9px; }.branch-metrics b { color: #42584d; font-size: 11px; }
 .branch-contact { color: #99a39e; font-size: 8px; }
 .page-footer { display: flex; justify-content: space-between; margin-top: 27px; color: #a0aaa4; font-size: 8px; }
-.toast { position: fixed; top: 77px; right: 28px; z-index: 9; display: flex; max-width: min(460px, calc(100vw - 32px)); align-items: center; gap: 10px; border: 1px solid #dfeae3; border-radius: 8px; background: #fff; padding: 11px 13px; box-shadow: 0 14px 30px rgb(20 45 34 / 13%); color: #476254; font-size: 10px; }
+.toast { position: fixed; top: 77px; right: 28px; z-index: 30; display: flex; max-width: min(460px, calc(100vw - 32px)); align-items: center; gap: 10px; border: 1px solid #dfeae3; border-radius: 8px; background: #fff; padding: 11px 13px; box-shadow: 0 14px 30px rgb(20 45 34 / 13%); color: #476254; font-size: 10px; }
 .toast > span { display: grid; width: 20px; height: 20px; place-items: center; border-radius: 50%; background: #e6f3eb; color: #348365; font-weight: 700; }.toast.error { border-color: #f0d7cd; color: #994f3d; }.toast.error > span { background: #fff0e9; color: #b75f47; }
 .toast button { margin-left: 5px; border: 0; background: transparent; color: #89978f; font-size: 16px; }
 .refresh-line { position: fixed; top: 64px; right: 0; left: 252px; z-index: 8; height: 2px; animation: pulse 1.1s infinite ease-in-out; background: #49a27f; }

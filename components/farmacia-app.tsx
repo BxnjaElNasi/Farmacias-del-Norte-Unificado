@@ -1211,7 +1211,7 @@ function ModalForm({ modal, products, branches, categories, editingBranch, editi
           <label className="wide-field">Nombre completo<input name="fullName" defaultValue={editingUser.full_name} maxLength={160} required /></label>
           <label className="wide-field">Correo electrónico<input name="email" type="email" defaultValue={editingUser.email} maxLength={254} required /></label>
           {editingUser.role === "employee" ? <label className="wide-field">Sucursal<select name="branchId" defaultValue={editingUser.branch_id ?? ""} required>{branches.filter((branch) => branch.active || branch.id === editingUser.branch_id).map((branch) => <option key={branch.id} value={branch.id}>{branch.name}{branch.active ? "" : " · inactiva"}</option>)}</select></label> : <label>Rol<input value={roleName(editingUser.role)} readOnly /></label>}
-          <label className="wide-field">Nueva contraseña (opcional)<input name="password" type="password" autoComplete="new-password" minLength={12} placeholder="Dejar vacío para conservarla" /></label>
+          <label className="wide-field">Nueva contraseña (opcional)<input name="password" type="password" autoComplete="new-password" minLength={12} placeholder="Dejar vacío para conservarla" /><small>Mínimo 12 caracteres. Si no la cambiás, dejala vacía.</small></label>
           <label className="checkbox-field"><input type="checkbox" name="active" defaultChecked={editingUser.active} /> Cuenta activa</label>
         </div>}
         {modal === "movement-edit" && editingMovement && <div className="form-grid">
