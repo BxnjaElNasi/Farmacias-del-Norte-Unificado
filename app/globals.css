@@ -494,6 +494,12 @@ html { scroll-behavior: smooth; }
 .danger-button { width: 100%; border: 1px solid #e2b4ad; border-radius: 8px; background: #fff5f3; color: #b3261e; padding: 10px 14px; font-size: 13px; cursor: pointer; }
 .danger-button:hover { background: #fde7e3; }
 .danger-button:disabled { opacity: .6; cursor: default; }
-@media (min-width: 901px) { .sales-layout { grid-template-columns: minmax(280px, .6fr) minmax(0, 2.4fr); } }
-.sales-history td, .sales-history th { font-size: 12px; }
-@media (min-width: 901px) { .sale-items { max-width: none; font-size: 11px; } }
+@media (min-width: 901px) {
+  .sales-layout { grid-template-columns: 1fr; }
+  .sales-layout .sale-form { max-width: 640px; }
+  .sales-history { width: 100%; }
+}
+.sales-history td { font-size: 14px; padding: 15px 18px; }
+.sales-history th { font-size: 12px; padding: 13px 18px; }
+.sales-history .sale-items { font-size: 13px !important; max-width: none !important; }
+
