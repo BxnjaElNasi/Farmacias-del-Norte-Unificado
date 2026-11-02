@@ -513,7 +513,7 @@ export function FarmaciaApp() {
           method: "POST",
           body: JSON.stringify({
             ...values,
-            branchId,
+            branchId: values.branchId || branchId,
             quantity: Number(values.quantity),
             expiresOn: values.expiresOn || null,
           }),
@@ -844,7 +844,7 @@ export function FarmaciaApp() {
                       <td className="mono">{product.internal_code}</td><td>{product.category}</td>{admin && <><td>{money.format(product.cost_price ?? 0)}</td><td>{product.sale_price > 0 && product.cost_price !== null ? `${(((product.sale_price - product.cost_price) / product.sale_price) * 100).toFixed(1)}%` : "—"}</td></>}<td className="price-cell">{money.format(product.sale_price)}</td>
                       <td><span className={`stock-pill ${product.stock <= product.minimum_stock ? "stock-low" : "stock-ok"}`}>{quantityFormat.format(product.stock)} ud.</span></td>
                       <td><span className={`status-pill ${product.active ? "good" : "muted"}`}><i />{product.active ? "Activo" : "Inactivo"}</span></td>
-                      {admin && <td><div className="table-actions"><button className="text-button" onClick={() => { setEditingProduct(product); setModal("product-edit"); }}>Editar</button><button className="text-button" onClick={() => void showPriceHistory(product)}>Precios</button><button className="text-button" disabled={!branchId} title={branchId ? "Ajustar existencias en la sucursal seleccionada" : "Elegí una sucursal arriba para ajustar stock"} onClick={() => { setEditingProduct(product); setModal("inventory"); }}>Ajustar stock</button></div></td>}
+                      {admin && <td><div className="table-actions"><button className="text-button" onClick={() => { setEditingProduct(product); setModal("product-edit"); }}>Editar</button><button className="text-button" onClick={() => void showPriceHistory(product)}>Precios</button><button className="text-button" onClick={() => { setEditingProduct(product); setModal("inventory"); }}>Ajustar stock</button></div></td>}
                     </tr>)}
                   </tbody></table></div>
                 )}
@@ -858,7 +858,7 @@ export function FarmaciaApp() {
               <PageHeading eyebrow="CONTROL OPERATIVO" title="Inventario" detail={branchId
                 ? `Existencias y movimientos · ${branches.find((branch) => branch.id === branchId)?.name || user?.branchName || ""}`
                 : "Existencias consolidadas de todas las sucursales, con detalle por lote"}>
-                {user?.role !== "employee" && <button className="primary-button" onClick={() => setModal("inventory")} disabled={!branchId}><span>＋</span> Registrar movimiento</button>}
+                {user?.role !== "employee" && <button className="primary-button" onClick={() => setModal("inventory")}><span>＋</span> Registrar movimiento</button>}
               </PageHeading>
               <div className="table-card">
                 <div className="table-meta"><div><b>Existencias por producto</b><span>{branchId ? "Inventario por sucursal y lote" : "Totales de la red; el detalle conserva sucursal y lote"}</span></div><div className="table-actions"><button className="text-button" onClick={() => void refresh()}>↻ Actualizar</button>{inventory?.stock.length ? <button className="text-button" onClick={() => downloadCsv("inventario-sucursales.csv", inventoryCsvRows(inventory.stock, branches.find((branch) => branch.id === branchId)?.name ?? user?.branchName ?? null))}>Exportar CSV ↓</button> : null}</div></div>
@@ -924,7 +924,7 @@ export function FarmaciaApp() {
           <footer className="page-footer"><span>Farmacias del Norte</span><span>Datos centralizados · Acceso según tu perfil</span></footer>
         </div>
       </main>
-      {modal && <ModalForm key={modal} modal={modal} products={products} branches={branches} categories={categories} editingBranch={editingBranch} editingProduct={editingProduct} editingUser={editingUser} editingMovement={editingMovement} priceHistory={priceHistory} busy={busy} onClose={() => setModal(null)} onSubmit={handleSubmit} onDeleteBranch={deleteBranch} />}
+      {modal && <ModalForm key={modal} modal={modal} products={products} branches={branches} categories={categories} editingBranch={editingBranch} editingProduct={editingProduct} editingUser={editingUser} editingMovement={editingMovement} priceHistory={priceHistory} busy={busy} onClose={() => setModal(null)} onSubmit={handleSubmit} onDeleteBranch={deleteBranch} selectedBranchId={branchId || null} isAdmin={admin} />}
       {receiptMovement && <ReceiptModal movement={receiptMovement} email={receiptEmail} error={receiptError} onEmailChange={setReceiptEmail} busy={busy} onClose={() => setReceiptMovement(null)} onSubmit={sendMovementReceipt} />}
     </div>
   );
@@ -1141,8 +1141,10 @@ function SaleForm({ products, onSubmit, busy }: { products: Product[]; onSubmit:
   );
 }
 
-function ModalForm({ modal, products, branches, categories, editingBranch, editingProduct, editingUser, editingMovement, priceHistory, busy, onClose, onSubmit, onDeleteBranch }: {
+function ModalForm({ modal, products, branches, categories, editingBranch, editingProduct, editingUser, editingMovement, priceHistory, busy, onClose, onSubmit, onDeleteBranch, selectedBranchId, isAdmin }: {
   onDeleteBranch?: (branch: Branch) => void;
+  selectedBranchId?: string | null;
+  isAdmin?: boolean;
   modal: Exclude<Modal, null>;
   products: Product[];
   branches: Branch[];
@@ -1191,6 +1193,7 @@ function ModalForm({ modal, products, branches, categories, editingBranch, editi
           {modal === "product-edit" && <label className="checkbox-field"><input type="checkbox" name="active" defaultChecked={editingProduct?.active ?? true} /> Producto activo</label>}
         </div>}
         {modal === "inventory" && <div className="form-grid">
+          {isAdmin && <label className="wide-field">Sucursal<select name="branchId" required defaultValue={selectedBranchId ?? ""}><option value="" disabled>Selecciona una sucursal</option>{branches.filter((branch) => branch.active).map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select></label>}
           <label className="wide-field">Producto<select name="productId" required defaultValue={editingProduct?.id ?? ""}><option value="" disabled>Selecciona un producto</option>{products.map((product) => <option key={product.id} value={product.id}>{product.name} · {product.internal_code}</option>)}</select></label>
           <label>Operación<select name="movementType" value={movementType} onChange={(event) => setMovementType(event.target.value)}><option value="in">Entrada</option><option value="out">Salida</option><option value="loss">Merma / producto dañado</option></select></label>
           <label>Cantidad<input name="quantity" type="number" min="1" step="1" required /></label>
