@@ -55,3 +55,47 @@ function optionalText(value: unknown, fallback: string, label: string, maxLength
   }
   return value.trim();
 }
+
+export async function DELETE(_request: Request, context: RouteContext) {
+  try {
+    const user = await requireRole("admin");
+    const { id: rawId } = await context.params;
+    const branchId = requiredUuid(rawId, "Sucursal");
+
+    const outcome = await withTransaction(async (client) => {
+      const found = await client.query("SELECT id, name FROM branches WHERE id = $1 FOR UPDATE", [branchId]);
+      const branch = found.rows[0];
+      if (!branch) throw new HttpError("La sucursal no existe.", 404);
+
+      await client.query("SAVEPOINT branch_delete");
+      try {
+        // El registro de auditoría se conserva; solo se desvincula de la sucursal borrada.
+        await client.query("UPDATE audit_log SET branch_id = NULL WHERE branch_id = $1", [branchId]);
+        await client.query("DELETE FROM branch_cameras WHERE branch_id = $1", [branchId]);
+        await client.query("DELETE FROM branch_prices WHERE branch_id = $1", [branchId]);
+        await client.query("DELETE FROM inventory_lots WHERE branch_id = $1", [branchId]);
+        await client.query("DELETE FROM inventory WHERE branch_id = $1", [branchId]);
+        await client.query("DELETE FROM branches WHERE id = $1", [branchId]);
+        await client.query("RELEASE SAVEPOINT branch_delete");
+        return { deleted: true, archived: false, name: branch.name };
+      } catch (error) {
+        if (typeof error !== "object" || error === null || !("code" in error) || error.code !== "23503") throw error;
+        // Tiene ventas, movimientos, pedidos o usuarios asignados: no se puede borrar sin perder historial.
+        await client.query("ROLLBACK TO SAVEPOINT branch_delete");
+        await client.query("UPDATE branches SET active = false, updated_at = now() WHERE id = $1", [branchId]);
+        return { deleted: false, archived: true, name: branch.name };
+      }
+    });
+
+    await withTransaction(async (client) => {
+      await client.query(
+        `INSERT INTO audit_log (user_id, branch_id, action, entity_type, entity_id, details)
+         VALUES ($1, NULL, $2, 'branch', $3, $4)`,
+        [user.id, outcome.deleted ? "branch.deleted" : "branch.archived", branchId, JSON.stringify({ name: outcome.name })],
+      );
+    });
+    return NextResponse.json(outcome);
+  } catch (error) {
+    return apiError(error);
+  }
+}

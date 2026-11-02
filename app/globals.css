@@ -489,3 +489,11 @@ html { scroll-behavior: smooth; }
 @keyframes rec-blink { to { visibility: hidden; } }
 @keyframes scan-down { from { top: -4px; } to { top: 100%; } }
 @media (prefers-reduced-motion: reduce) { .thermal-layer, .radar-sweep, .thermal-blip, .camera-rec, .camera-scanline { animation: none; } }
+
+/* Botón de eliminar (rojo) y vista de ventas más amplia */
+.danger-button { width: 100%; border: 1px solid #e2b4ad; border-radius: 8px; background: #fff5f3; color: #b3261e; padding: 10px 14px; font-size: 13px; cursor: pointer; }
+.danger-button:hover { background: #fde7e3; }
+.danger-button:disabled { opacity: .6; cursor: default; }
+@media (min-width: 901px) { .sales-layout { grid-template-columns: minmax(280px, .6fr) minmax(0, 2.4fr); } }
+.sales-history td, .sales-history th { font-size: 12px; }
+@media (min-width: 901px) { .sale-items { max-width: none; font-size: 11px; } }

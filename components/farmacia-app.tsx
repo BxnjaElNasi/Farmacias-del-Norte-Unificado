@@ -255,6 +255,16 @@ export function FarmaciaApp() {
   const [todayLabel, setTodayLabel] = useState("");
 
   useEffect(() => {
+    // Al salir de Administración (o recargarla) se cierra la sesión: hay que volver a ingresar.
+    const logout = () => { void fetch("/api/auth/logout", { method: "POST", keepalive: true }); };
+    window.addEventListener("pagehide", logout);
+    return () => {
+      window.removeEventListener("pagehide", logout);
+      logout();
+    };
+  }, []);
+
+  useEffect(() => {
     const timer = window.setTimeout(() => {
       setTodayLabel(new Intl.DateTimeFormat("es", { dateStyle: "long" }).format(new Date()));
     }, 0);
@@ -583,6 +593,22 @@ export function FarmaciaApp() {
     }
   }
 
+  async function deleteBranch(branch: Branch) {
+    if (!window.confirm(`¿Eliminar la sucursal ${branch.name}? Si tiene ventas o movimientos no se borra, solo se desactiva para conservar el historial.`)) return;
+    setBusy(true);
+    try {
+      const result = await requestJson<{ deleted: boolean; archived: boolean }>(`/api/branches/${branch.id}`, { method: "DELETE" });
+      setModal(null);
+      setEditingBranch(null);
+      if (user) await loadSectionData(user, "branches", branchId);
+      setNotice({ type: "success", text: result.deleted ? "Sucursal eliminada." : "La sucursal tiene historial, así que se desactivó en lugar de borrarse." });
+    } catch (error) {
+      setNotice({ type: "error", text: error instanceof Error ? error.message : "No se pudo eliminar la sucursal." });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function setBranchActive(branch: Branch) {
     if (!window.confirm(`${branch.active ? "Desactivar" : "Reactivar"} ${branch.name}? Se conservarán sus ventas e historial.`)) return;
     try {
@@ -818,7 +844,7 @@ export function FarmaciaApp() {
                       <td className="mono">{product.internal_code}</td><td>{product.category}</td>{admin && <><td>{money.format(product.cost_price ?? 0)}</td><td>{product.sale_price > 0 && product.cost_price !== null ? `${(((product.sale_price - product.cost_price) / product.sale_price) * 100).toFixed(1)}%` : "—"}</td></>}<td className="price-cell">{money.format(product.sale_price)}</td>
                       <td><span className={`stock-pill ${product.stock <= product.minimum_stock ? "stock-low" : "stock-ok"}`}>{quantityFormat.format(product.stock)} ud.</span></td>
                       <td><span className={`status-pill ${product.active ? "good" : "muted"}`}><i />{product.active ? "Activo" : "Inactivo"}</span></td>
-                      {admin && <td><div className="table-actions"><button className="text-button" onClick={() => { setEditingProduct(product); setModal("product-edit"); }}>Editar</button><button className="text-button" onClick={() => void showPriceHistory(product)}>Precios</button></div></td>}
+                      {admin && <td><div className="table-actions"><button className="text-button" onClick={() => { setEditingProduct(product); setModal("product-edit"); }}>Editar</button><button className="text-button" onClick={() => void showPriceHistory(product)}>Precios</button><button className="text-button" disabled={!branchId} title={branchId ? "Ajustar existencias en la sucursal seleccionada" : "Elegí una sucursal arriba para ajustar stock"} onClick={() => { setEditingProduct(product); setModal("inventory"); }}>Ajustar stock</button></div></td>}
                     </tr>)}
                   </tbody></table></div>
                 )}
@@ -898,7 +924,7 @@ export function FarmaciaApp() {
           <footer className="page-footer"><span>Farmacias del Norte</span><span>Datos centralizados · Acceso según tu perfil</span></footer>
         </div>
       </main>
-      {modal && <ModalForm key={modal} modal={modal} products={products} branches={branches} categories={categories} editingBranch={editingBranch} editingProduct={editingProduct} editingUser={editingUser} editingMovement={editingMovement} priceHistory={priceHistory} busy={busy} onClose={() => setModal(null)} onSubmit={handleSubmit} />}
+      {modal && <ModalForm key={modal} modal={modal} products={products} branches={branches} categories={categories} editingBranch={editingBranch} editingProduct={editingProduct} editingUser={editingUser} editingMovement={editingMovement} priceHistory={priceHistory} busy={busy} onClose={() => setModal(null)} onSubmit={handleSubmit} onDeleteBranch={deleteBranch} />}
       {receiptMovement && <ReceiptModal movement={receiptMovement} email={receiptEmail} error={receiptError} onEmailChange={setReceiptEmail} busy={busy} onClose={() => setReceiptMovement(null)} onSubmit={sendMovementReceipt} />}
     </div>
   );
@@ -1115,7 +1141,8 @@ function SaleForm({ products, onSubmit, busy }: { products: Product[]; onSubmit:
   );
 }
 
-function ModalForm({ modal, products, branches, categories, editingBranch, editingProduct, editingUser, editingMovement, priceHistory, busy, onClose, onSubmit }: {
+function ModalForm({ modal, products, branches, categories, editingBranch, editingProduct, editingUser, editingMovement, priceHistory, busy, onClose, onSubmit, onDeleteBranch }: {
+  onDeleteBranch?: (branch: Branch) => void;
   modal: Exclude<Modal, null>;
   products: Product[];
   branches: Branch[];
@@ -1144,6 +1171,7 @@ function ModalForm({ modal, products, branches, categories, editingBranch, editi
           <label className="wide-field">Imagen de sucursal (URL HTTPS)<input name="imageUrl" type="url" placeholder="https://…" defaultValue={editingBranch?.image_url ?? ""} /></label>
           <label className="wide-field">Zona de entrega (si está confirmada)<input name="deliveryZone" maxLength={160} placeholder="Barrio o zona verificada" defaultValue={editingBranch?.delivery_zone ?? ""} /></label>
           {modal === "branch-edit" && <label className="checkbox-field"><input type="checkbox" name="active" defaultChecked={editingBranch?.active} /> Sucursal activa</label>}
+          {modal === "branch-edit" && editingBranch && <div className="wide-field"><button type="button" className="danger-button" disabled={busy} onClick={() => onDeleteBranch?.(editingBranch)}>Eliminar sucursal</button></div>}
         </div>}
         {(modal === "product" || modal === "product-edit") && <div className="form-grid">
           <label>Código interno<input name="internalCode" maxLength={48} defaultValue={editingProduct?.internal_code ?? ""} required /></label><label>Código de barras<input name="barcode" maxLength={64} defaultValue={editingProduct?.barcode ?? ""} /></label>
@@ -1163,7 +1191,7 @@ function ModalForm({ modal, products, branches, categories, editingBranch, editi
           {modal === "product-edit" && <label className="checkbox-field"><input type="checkbox" name="active" defaultChecked={editingProduct?.active ?? true} /> Producto activo</label>}
         </div>}
         {modal === "inventory" && <div className="form-grid">
-          <label className="wide-field">Producto<select name="productId" required defaultValue=""><option value="" disabled>Selecciona un producto</option>{products.map((product) => <option key={product.id} value={product.id}>{product.name} · {product.internal_code}</option>)}</select></label>
+          <label className="wide-field">Producto<select name="productId" required defaultValue={editingProduct?.id ?? ""}><option value="" disabled>Selecciona un producto</option>{products.map((product) => <option key={product.id} value={product.id}>{product.name} · {product.internal_code}</option>)}</select></label>
           <label>Operación<select name="movementType" value={movementType} onChange={(event) => setMovementType(event.target.value)}><option value="in">Entrada</option><option value="out">Salida</option><option value="loss">Merma / producto dañado</option></select></label>
           <label>Cantidad<input name="quantity" type="number" min="1" step="1" required /></label>
           {movementType === "in" && <><label>Número de lote<input name="lotNumber" required maxLength={64} /></label><label>Vencimiento<input name="expiresOn" type="date" /></label></>}
