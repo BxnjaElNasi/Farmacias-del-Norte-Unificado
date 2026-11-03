@@ -503,3 +503,18 @@ html { scroll-behavior: smooth; }
 .sales-history th { font-size: 12px; padding: 13px 18px; }
 .sales-history .sale-items { font-size: 13px !important; max-width: none !important; }
 
+
+/* Celular: portada, login y panel legibles en pantallas chicas */
+@media (max-width: 640px) {
+  .hero-care-icon { display: none; }
+  .hero-care-card { padding: 16px 18px; max-width: 170px; }
+  .hero-care-card b { font-size: 16px; }
+  .hero-sticker { font-size: 11px; }
+  .store-text-link { font-size: 14px; }
+  .store-hero-actions { flex-wrap: wrap; gap: 12px; }
+  .store-hero-actions .store-primary-button { width: 100%; justify-content: center; }
+  .store-section-heading { gap: 10px; }
+  .store-section-heading h2 { font-size: 30px; }
+  .modal-card { width: 100%; }
+  .table-scroll table { min-width: 620px; }
+}
