@@ -301,10 +301,7 @@ export function LandingPage() {
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: reduceMotion ? 0 : 0.7, delay: reduceMotion ? 0 : 0.12, ease: "easeOut" }}
         >
-          <div className="hero-sun" /><div className="hero-mountain mountain-back" /><div className="hero-mountain mountain-front" />
-          <div className="hero-care-card"><span className="hero-care-icon">✚</span><b>Un equipo<br />cerca tuyo</b><small>Farmacias del Norte</small></div>
-          <span className="hero-sticker">CUIDADO<br />CON CALIDEZ</span>
-          <span className="hero-leaf leaf-one" /><span className="hero-leaf leaf-two" />
+          <img className="hero-image" src="/hero-farmacia.png" alt="Farmacias del Norte: tu salud, nuestra prioridad" />
         </motion.div>
       </section>
 

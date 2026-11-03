@@ -518,3 +518,6 @@ html { scroll-behavior: smooth; }
   .modal-card { width: 100%; }
   .table-scroll table { min-width: 620px; }
 }
+
+/* Imagen principal de la portada */
+.hero-image { display: block; width: 100%; height: auto; max-width: 560px; margin: 0 auto; }
